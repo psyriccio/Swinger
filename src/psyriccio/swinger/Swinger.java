@@ -16,7 +16,16 @@ import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
 
@@ -26,6 +35,117 @@ import javax.swing.SwingUtilities;
  * @author psyriccio
  */
 public class Swinger {
+
+    public static class ThreadPool {
+
+        public static class CallableWithCallback<P, T> implements Callable<T> {
+
+            private final Consumer<P> progressConsumer;
+            private final Function<Consumer<P>, T> work;
+
+            public CallableWithCallback(Function<Consumer<P>, T> work, Consumer<P> progressConsumer) {
+                this.progressConsumer = progressConsumer;
+                this.work = work;
+            }
+
+            @Override
+            public T call() throws Exception {
+                return work.apply(progressConsumer);
+            }
+
+        }
+
+        public enum Mode {
+            Single, SingleScheduled, Fixed, Scheduled, Cached, WorkStealing
+        }
+
+        private static ExecutorService executorService;
+        private static boolean scheduled;
+
+        private static ScheduledExecutorService getServiceAsScheduled() {
+            return  isScheduled() ? (ScheduledExecutorService) executorService : null;
+        }
+
+        public static boolean isScheduled() {
+            return scheduled;
+        }
+
+        public static void init(Mode mode) {
+            switch (mode) {
+                case Single:
+                    executorService = Executors.newSingleThreadExecutor();
+                    scheduled = false;
+                    break;
+                case SingleScheduled:
+                    executorService = Executors.newSingleThreadScheduledExecutor();
+                    scheduled = true;
+                    break;
+                case Fixed:
+                    executorService = Executors.newSingleThreadExecutor();
+                    scheduled = false;
+                    break;
+                case Scheduled:
+                    throw new RuntimeException("nThreads parameter required for scheduled thread pool mode");
+                case Cached:
+                    executorService = Executors.newCachedThreadPool();
+                    scheduled = false;
+                    break;
+                case WorkStealing:
+                    throw new RuntimeException("parallelismLvl parameter required for work-stealing thread pool mode");
+            }
+        }
+
+        public static void init(Mode mode, int nThreadsOrParallelismLvl) {
+            switch (mode) {
+                case Single:
+                    executorService = Executors.newSingleThreadExecutor();
+                    scheduled = false;
+                    break;
+                case SingleScheduled:
+                    executorService = Executors.newSingleThreadScheduledExecutor();
+                    scheduled = true;
+                    break;
+                case Fixed:
+                    executorService = Executors.newSingleThreadExecutor();
+                    scheduled = false;
+                    break;
+                case Scheduled:
+                    executorService = Executors.newScheduledThreadPool(nThreadsOrParallelismLvl);
+                    scheduled = true;
+                    break;
+                case Cached:
+                    executorService = Executors.newCachedThreadPool();
+                    scheduled = false;
+                    break;
+                case WorkStealing:
+                    executorService = Executors.newWorkStealingPool(nThreadsOrParallelismLvl);
+                    scheduled = false;
+                    break;
+            }
+        }
+
+        public static <T> Future<T> submit(Callable<T> task) {
+            return executorService.submit(task);
+        }
+
+        public static Future<?> submit(Runnable task) {
+            return executorService.submit(task);
+        }
+
+        public static <T> Future<T> submit(Runnable task, T result) {
+            return executorService.submit(task, result);
+        }
+
+        public static <T> void doWorkThenInvokeUI(final Callable<T> work, Consumer<T> uiCallBack) {
+            Callable<T> subcl = () -> {
+                Future<T> future = submit(work);
+                uiCallBack.accept(future.get(1, TimeUnit.DAYS));
+                return future.get();
+            };
+            submit(subcl);
+        }
+
+    }
 
     private static final List<Consumer<Throwable>> GEC = new ArrayList<>();
 
