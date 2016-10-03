@@ -1,0 +1,74 @@
+buildscript {
+    repositories { jcenter() }
+    dependencies {
+        classpath 'com.github.jengelman.gradle.plugins:shadow:1.2.3'
+    }
+    repositories {
+        mavenCentral()
+    }
+}
+
+plugins {
+    id "com.github.johnrengelman.shadow" version "1.2.3"
+}
+
+ext.mainClass = ''
+
+apply plugin: 'java'
+apply plugin: 'com.github.johnrengelman.shadow'
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    maven {
+    	url 'https://raw.github.com/Ekito/maven-repo/master/releases'
+    }
+    maven {
+      url 'http://maven.imagej.net/content/repositories/releases/'
+    }
+}
+
+sourceCompatibility = 1.8
+version = 'latest-SNAPSHOT'
+
+jar {
+    manifest {
+        attributes 'Implementation-Title': 'Swinger',
+                   'Implementation-Version': version,
+                   'Main-Class': ''
+    }
+}
+
+shadowJar {
+    dependencies {
+        exclude(dependency('com.google.android:android:.*'))
+        exclude(dependency('org.eclipse.swt.win32.win32:.*'))
+    }
+}
+
+dependencies {
+    compile fileTree(dir: 'lib').matching { include '*.jar'}
+}
+
+apply plugin: 'java'
+
+sourceSets {
+    main {
+        java {
+            srcDir 'src'
+        }
+        resources {
+            srcDir 'src'
+            include '**/*'
+        }
+    }
+}
+
+task copyDeps(type: Copy) {
+   from configurations.compile
+   into 'libs'
+}
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '2.4'
+}
