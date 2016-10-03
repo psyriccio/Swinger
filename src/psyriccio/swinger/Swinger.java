@@ -22,8 +22,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.swing.JComponent;
@@ -36,8 +34,14 @@ import javax.swing.SwingUtilities;
  */
 public class Swinger {
 
+    /**
+     * Threading subsystem
+     */
     public static class ThreadPool {
 
+        /**
+         * Callable with progress-notification consumer
+         */
         public static class CallableWithCallback<P, T> implements Callable<T> {
 
             private final Consumer<P> progressConsumer;
@@ -55,6 +59,9 @@ public class Swinger {
 
         }
 
+        /**
+         * Threading pool work modes
+         */
         public enum Mode {
             Single, SingleScheduled, Fixed, Scheduled, Cached, WorkStealing
         }
@@ -63,13 +70,21 @@ public class Swinger {
         private static boolean scheduled;
 
         private static ScheduledExecutorService getServiceAsScheduled() {
-            return  isScheduled() ? (ScheduledExecutorService) executorService : null;
+            return isScheduled() ? (ScheduledExecutorService) executorService : null;
         }
 
+        /**
+         * Returns true, if thread pool in scheduled mode
+         */
         public static boolean isScheduled() {
             return scheduled;
         }
 
+        /**
+         * Initializes thread pool with mode-specified type
+         *
+         * @param mode Thread pool work mode
+         */
         public static void init(Mode mode) {
             switch (mode) {
                 case Single:
@@ -95,6 +110,14 @@ public class Swinger {
             }
         }
 
+        /**
+         * Initializes thread pool with mode-specified type and number of thread
+         * or parallelism level
+         *
+         * @param mode Thread pool work mode
+         * @param nThreadsOrParallelismLvl number of thread for scheduled mode
+         * or parallelism level for work-stealing mode
+         */
         public static void init(Mode mode, int nThreadsOrParallelismLvl) {
             switch (mode) {
                 case Single:
@@ -124,18 +147,43 @@ public class Swinger {
             }
         }
 
+        /**
+         * Submits a piece of work to thread pool
+         *
+         * @param task Callable to submit
+         * @param <T> Return type for callable
+         */
         public static <T> Future<T> submit(Callable<T> task) {
             return executorService.submit(task);
         }
 
+        /**
+         * Submits a piece of work to thread pool
+         *
+         * @param task Callable to submit
+         */
         public static Future<?> submit(Runnable task) {
             return executorService.submit(task);
         }
 
+        /**
+         * Submits a piece of work to thread pool
+         *
+         * @param task Runnable to submit
+         * @param result Return value
+         * @param <T> Return type
+         */
         public static <T> Future<T> submit(Runnable task, T result) {
             return executorService.submit(task, result);
         }
 
+        /**
+         * Executes callable, then invoke Consumer in UI-thread
+         *
+         * @param work Callable to execute
+         * @param uiCallBack Consumer for UI-thread invocation
+         * @param <T> Return type
+         */
         public static <T> void doWorkThenInvokeUI(final Callable<T> work, Consumer<T> uiCallBack) {
             Callable<T> subcl = () -> {
                 Future<T> future = submit(work);
