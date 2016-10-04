@@ -24,6 +24,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
 
@@ -41,6 +43,9 @@ public class Swinger {
 
         /**
          * Callable with progress-notification consumer
+         *
+         * @param <P> UI-update value type
+         * @param <T> UI-result type
          */
         public static class CallableWithCallback<P, T> implements Callable<T> {
 
@@ -75,6 +80,8 @@ public class Swinger {
 
         /**
          * Returns true, if thread pool in scheduled mode
+         *
+         * @return true - thread pool in scheduled mode, false - otherwise
          */
         public static boolean isScheduled() {
             return scheduled;
@@ -152,6 +159,7 @@ public class Swinger {
          *
          * @param task Callable to submit
          * @param <T> Return type for callable
+         * @return Result-future
          */
         public static <T> Future<T> submit(Callable<T> task) {
             return executorService.submit(task);
@@ -161,6 +169,7 @@ public class Swinger {
          * Submits a piece of work to thread pool
          *
          * @param task Callable to submit
+         * @return Result-future
          */
         public static Future<?> submit(Runnable task) {
             return executorService.submit(task);
@@ -172,6 +181,7 @@ public class Swinger {
          * @param task Runnable to submit
          * @param result Return value
          * @param <T> Return type
+         * @return Result-future
          */
         public static <T> Future<T> submit(Runnable task, T result) {
             return executorService.submit(task, result);
@@ -191,6 +201,40 @@ public class Swinger {
                 return future.get();
             };
             submit(subcl);
+        }
+
+        public static <T, P> void doWorkWithLiveUI(final Function<Consumer<P>, T> work, Consumer<P> uiUpdate, Consumer<T> uiResult) throws Exception {
+            submit(() -> {
+                Consumer<P> updSubCons = (P t) -> {
+                    try {
+                        doInUIThreadAndWait(() -> {
+                            uiUpdate.accept(t);
+                        });
+                    } catch (InterruptedException | InvocationTargetException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                };
+                T result = new CallableWithCallback<>(work, updSubCons).call();
+                doInUIThreadAndWait(() -> {
+                    uiResult.accept(result);
+                });
+                return result;
+            });
+        }
+
+        public static <T, P> void doWorkWithLiveUISafe(final Function<Consumer<P>, T> work, Consumer<P> uiUpdate, Consumer<T> uiResult) throws Exception {
+            submit(() -> {
+                Consumer<P> updSubCons = (P t) -> {
+                    doInUIThreadAndWaitSafe(() -> {
+                        uiUpdate.accept(t);
+                    });
+                };
+                T result = new CallableWithCallback<>(work, updSubCons).call();
+                doInUIThreadAndWaitSafe(() -> {
+                    uiResult.accept(result);
+                });
+                return result;
+            });
         }
 
     }
@@ -326,7 +370,7 @@ public class Swinger {
     }
 
     /**
-     * Accepts consumer, only if component is JComponent subclass and not null
+     * Accepts consumer, only if component is JComponent subclass
      *
      * @param component Component to check and accept
      * @param consumer Consumer that accepts component
@@ -335,9 +379,7 @@ public class Swinger {
         if (component instanceof JComponent) {
             try {
                 JComponent jcom = (JComponent) component;
-                if (jcom != null) {
-                    consumer.accept(jcom);
-                }
+                consumer.accept(jcom);
             } catch (Throwable ex) {
                 // empty
             }
