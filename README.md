@@ -25,6 +25,6 @@ public static void loadFontAsMain(File fontFile, Component... components);
 ```java
 Swinger.loadFontAsMain(new File("path/to/my/cool/font.ttf"), myFrame, myPanel, myButton);
 ```
-Load font fron file and apply to myFrame-based component tree, then to myPanel-based, then to myButton
+Load font from file and apply to myFrame-based component tree, then to myPanel-based, then to myButton
 
 ##### [javadoc](https://psyriccio.github.io/Swinger/)
